@@ -1161,14 +1161,11 @@ func (r *openaiRegistrar) oauthLogin(ctx context.Context, email, password string
 		}
 	}
 
-	// 步骤L3c: 如果 continue_url 包含 about-you，需要先完成个人资料填写（create_account）
+	// 步骤L3c: 如果 continue_url 包含 about-you，跳过直接走默认 consent
+	// （oauthLogin 是重新登录流程，账号在主流程已创建，新 session 调 create_account 会被拒绝）
 	if strings.Contains(strings.ToLower(login.continueURL), "about-you") {
-		r.logf("[*] OAuth 登录: 检测到 about-you 页面，填写个人资料...")
-		firstName, lastName := randomOpenAIName()
-		birthdate := randomBirthdate()
-		if err := login.step5(ctx, firstName, lastName, birthdate); err != nil {
-			r.logf("[!] OAuth 登录 about-you 填写失败: %s（继续尝试 consent）", err)
-		}
+		r.logf("[*] OAuth 登录: 检测到 about-you 页面，跳过直接走 consent")
+		login.continueURL = openaiConsentURL
 	}
 
 	// 步骤L4: consent 流程提取 code（复用 step6 的 consent 逻辑）
@@ -1621,7 +1618,7 @@ func (w *OpenAIWorker) registerViaService(ctx context.Context, serviceURL string
 
 	reqBody := openaiServiceRequest{
 		Proxy:         proxyStr,
-		YYDSMailURL:   settingOrDefault(opts.Config, "yydsmail_base_url", ""),
+		YYDSMailURL:   settingOrDefault(opts.Config, "yydsmail_base_url", "https://maliapi.215.im"),
 		YYDSMailKey:   opts.Config["yydsmail_api_key"],
 		EmailPriority: strings.Join(epParts, ","),
 	}
@@ -1782,7 +1779,7 @@ func (w *OpenAIWorker) callRegisterScript(ctx context.Context, email, password s
 		}
 	}
 
-	yydsMailURL := settingOrDefault(opts.Config, "yydsmail_base_url", "")
+	yydsMailURL := settingOrDefault(opts.Config, "yydsmail_base_url", "https://maliapi.215.im")
 	yydsMailKey := opts.Config["yydsmail_api_key"]
 	if yydsMailURL != "" && yydsMailKey != "" {
 		args = append(args, "--yydsmail-url", yydsMailURL, "--yydsmail-key", yydsMailKey)
